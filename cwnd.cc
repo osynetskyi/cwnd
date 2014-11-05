@@ -16,11 +16,9 @@
 #include "ns3/traced-callback.h"
 #include "ns3/log.h"
 #include "ns3/inet-socket-address.h"
-//#include "ns3/inet6-socket-address.h"
 #include "ns3/packet-socket-address.h"
 #include "ns3/node.h"
 #include "ns3/nstime.h"
-//#include "ns3/random-variable-stream.h"
 #include "ns3/socket.h"
 #include "ns3/simulator.h"
 #include "ns3/socket-factory.h"
@@ -163,25 +161,27 @@ static void CwndChange (uint32_t oldCwnd, uint32_t newCwnd)
 	NS_LOG_UNCOND ("Sender " << Simulator::GetContext () - 1 << " " << Simulator::Now ().GetSeconds () << "\t" << newCwnd);
 }
 
-static void RxDrop (Ptr<const Packet> p)
+/*static void RxDrop (Ptr<const Packet> p)
 {
 	NS_LOG_UNCOND ("RxDrop at " << Simulator::Now ().GetSeconds ());
-}
+}*/
 
 int 
 main (int argc, char *argv[])
 {
 	uint32_t alpha[NUM], beta[NUM];
 	int i = 0;
+	char buf_a[7];
+	char buf_b[6];
 	CommandLine cmd;
 
-	// TODO: add cmd args in a cycle
-	cmd.AddValue("alpha_1", "alpha 1", alpha[0]);
-	cmd.AddValue("alpha_2", "alpha 2", alpha[1]);
-	cmd.AddValue("beta_1", "beta 1", beta[0]);
-	cmd.AddValue("beta_2", "beta 2", beta[1]);
-	cmd.AddValue("alpha_3", "alpha 3", alpha[2]);
-	cmd.AddValue("beta_3", "beta 3", beta[2]);
+	for(i = 0; i < NUM; i++)
+	{
+		sprintf(buf_a, "alpha_%d", i + 1);
+		cmd.AddValue(buf_a, buf_a, alpha[i]);		
+		sprintf(buf_b, "beta_%d", i + 1);		
+		cmd.AddValue(buf_b, buf_b, beta[i]);
+	}
 	cmd.Parse(argc, argv);
 
 	NodeContainer p2pNodes, csmaNodesSend, csmaNodesReceive;
