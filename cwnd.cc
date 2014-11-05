@@ -193,7 +193,8 @@ main (int argc, char *argv[])
 
 	// bottleneck link
 	PointToPointHelper pointToPoint;
-	pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("7Mbps"));
+	//pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("7Mbps"));
+	pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("8Mbps"));
 	//pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
 	CsmaHelper csmaHelperSend, csmaHelperReceive;
 	//csmaHelper.SetChannelAttribute ("DataRate", DataRateValue (DataRate (5000000)));
@@ -256,7 +257,8 @@ main (int argc, char *argv[])
 	
 		/// setup the data-sending apps on sender nodes
 		app[i] = CreateObject<MyApp> ();
-		app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 100000, DataRate ("5Mbps"));
+		//app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 100000, DataRate ("5Mbps"));
+		app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 10000, DataRate ("3Mbps"));
 		csmaNodesSend.Get (i + 1)->AddApplication (app[i]);
 		app[i]->SetStartTime (Seconds (0.));
 		app[i]->SetStopTime (Seconds (SIMTIME));
@@ -274,8 +276,8 @@ main (int argc, char *argv[])
 	for(i = 0; i < NUM; i++)
 	{
 		sink[i] = DynamicCast<PacketSink> (sinkApps[i].Get (0));
-		//std::cout << "Total Bytes Received " << i + 1 << ": " << sink[i]->GetTotalRx () << std::endl;
-		//std::cout << "Time running " << i + 1 << ": " << app[i]->getTotalTime () << std::endl;
+		outfile << "Total Bytes Received " << i + 1 << ": " << sink[i]->GetTotalRx () << std::endl;
+		outfile << "Time running " << i + 1 << ": " << app[i]->getTotalTime () << std::endl;
 		outfile << "Goodput " << i + 1 << ": " << sink[i]->GetTotalRx () / app[i]->getTotalTime () << " B/s" << std::endl;
 	}
 	outfile.close();
