@@ -159,6 +159,19 @@ static void CwndChange (uint32_t oldCwnd, uint32_t newCwnd)
 {
 	// GetContext is used to find a NodeId of a node that triggered the event
 	NS_LOG_UNCOND ("Sender " << Simulator::GetContext () - 1 << " " << Simulator::Now ().GetSeconds () << "\t" << newCwnd);
+	TypeId tid = TypeId::LookupByName ("ns3::TcpReno");
+	std::stringstream nodeId;
+	nodeId << Simulator::GetContext ();
+	std::string specificNode = "/NodeList/" + nodeId.str () + "/$ns3::TcpL4Protocol/SocketType";
+	if(Simulator::GetContext () == 2) {
+		Config::Set (specificNode, TypeIdValue (tid));
+		NS_LOG_UNCOND ("SET!");
+	}
+}
+
+static void RwndChange (uint32_t oldRwnd, uint32_t newRwnd)
+{
+	NS_LOG_UNCOND ("RWND " << Simulator::GetContext () - 1 << " " << oldRwnd << " " << newRwnd);
 }
 
 /*static void RxDrop (Ptr<const Packet> p)
@@ -252,6 +265,7 @@ main (int argc, char *argv[])
 		Config::Set (specificNode[i], TypeIdValue (tid));
 		ns3TcpSocket[i] = Socket::CreateSocket (csmaNodesSend.Get (i + 1), TcpSocketFactory::GetTypeId ());
 		ns3TcpSocket[i]->TraceConnectWithoutContext ("CongestionWindow", MakeCallback (&CwndChange));
+		ns3TcpSocket[i]->TraceConnectWithoutContext ("RWND", MakeCallback (&RwndChange));
 		ns3TcpSocket[i]->SetAttribute("SegmentSize", UintegerValue(alpha[i]));
 		ns3TcpSocket[i]->SetAttribute("SlowStartThreshold", UintegerValue(beta[i]));
 	
