@@ -183,7 +183,8 @@ static void RttChange (Time oldRtt, Time newRtt)
 {
 	int num = Simulator::GetContext () - 1;
 	NS_LOG_UNCOND ("Rtt " << num << " " << newRtt.GetSeconds());
-	NS_LOG_UNCOND ("Approx. throughput " << num << " " << cwnds[num-1] / newRtt.GetSeconds() * 8 / 1024 / 1024 << " Mb/s");
+	NS_LOG_UNCOND ("Approx. throughput " << num << " " << Simulator::Now ().GetSeconds () << "\t" 
+					<< cwnds[num-1] / newRtt.GetSeconds() * 8 / 1024 / 1024);
 }
 
 /*static void RxDrop (Ptr<const Packet> p)
