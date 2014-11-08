@@ -40,6 +40,9 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("CWnd");
 
+// global variable for CWnds
+uint32_t cwnds[NUM];
+
 class MyApp : public Application 
 {
 	public:
@@ -64,8 +67,8 @@ class MyApp : public Application
 	EventId         m_sendEvent;
 	bool            m_running;
 	uint32_t        m_packetsSent;
-	double m_startTime;
-	double m_stopTime;
+	double 			m_startTime;
+	double 			m_stopTime;
 };
 
 MyApp::MyApp ()
@@ -158,20 +161,29 @@ void MyApp::ScheduleTx (void)
 static void CwndChange (uint32_t oldCwnd, uint32_t newCwnd)
 {
 	// GetContext is used to find a NodeId of a node that triggered the event
-	NS_LOG_UNCOND ("Sender " << Simulator::GetContext () - 1 << " " << Simulator::Now ().GetSeconds () << "\t" << newCwnd);
-	TypeId tid = TypeId::LookupByName ("ns3::TcpReno");
+	int num = Simulator::GetContext () - 1;
+	NS_LOG_UNCOND ("Sender " << num << " " << Simulator::Now ().GetSeconds () << "\t" << newCwnd);
+	cwnds[num - 1] = newCwnd;
+	/*TypeId tid = TypeId::LookupByName ("ns3::TcpReno");
 	std::stringstream nodeId;
 	nodeId << Simulator::GetContext ();
 	std::string specificNode = "/NodeList/" + nodeId.str () + "/$ns3::TcpL4Protocol/SocketType";
 	if(Simulator::GetContext () == 2) {
 		Config::Set (specificNode, TypeIdValue (tid));
 		NS_LOG_UNCOND ("SET!");
-	}
+	}*/
 }
 
-static void RwndChange (uint32_t oldRwnd, uint32_t newRwnd)
+/*static void RwndChange (uint32_t oldRwnd, uint32_t newRwnd)
 {
 	NS_LOG_UNCOND ("RWND " << Simulator::GetContext () - 1 << " " << oldRwnd << " " << newRwnd);
+}*/
+
+static void RttChange (Time oldRtt, Time newRtt)
+{
+	int num = Simulator::GetContext () - 1;
+	NS_LOG_UNCOND ("Rtt " << num << " " << newRtt.GetSeconds());
+	NS_LOG_UNCOND ("Approx. throughput " << num << " " << cwnds[num-1] / newRtt.GetSeconds() * 8 / 1024 / 1024 << " Mb/s");
 }
 
 /*static void RxDrop (Ptr<const Packet> p)
@@ -194,6 +206,7 @@ main (int argc, char *argv[])
 		cmd.AddValue(buf_a, buf_a, alpha[i]);		
 		sprintf(buf_b, "beta_%d", i + 1);		
 		cmd.AddValue(buf_b, buf_b, beta[i]);
+		cwnds[i] = 0;
 	}
 	cmd.Parse(argc, argv);
 
@@ -220,8 +233,19 @@ main (int argc, char *argv[])
 	csmaDevicesReceive = csmaHelperReceive.Install (csmaNodesReceive);
 
 	InternetStackHelper stack;
+	/*InternetStackHelper stack2;
+	stack.SetTcp ("ns3::NscTcpL4Protocol",
+                            "Library", StringValue ("liblinux2.6.26.so"));*/
 	stack.Install (csmaNodesSend);
 	stack.Install (csmaNodesReceive);
+	/*stack.Install(csmaNodesSend.Get(1));
+	stack.Install(csmaNodesSend.Get(2));
+	stack.Install(csmaNodesSend.Get(3));
+	stack.Install(csmaNodesReceive.Get(1));
+	stack.Install(csmaNodesReceive.Get(2));
+	stack.Install(csmaNodesReceive.Get(3));
+
+	stack2.Install(p2pNodes);*/
 
 	Ipv4AddressHelper address;
 	address.SetBase ("2.2.2.0", "255.255.255.0");
@@ -265,14 +289,15 @@ main (int argc, char *argv[])
 		Config::Set (specificNode[i], TypeIdValue (tid));
 		ns3TcpSocket[i] = Socket::CreateSocket (csmaNodesSend.Get (i + 1), TcpSocketFactory::GetTypeId ());
 		ns3TcpSocket[i]->TraceConnectWithoutContext ("CongestionWindow", MakeCallback (&CwndChange));
-		ns3TcpSocket[i]->TraceConnectWithoutContext ("RWND", MakeCallback (&RwndChange));
+		//ns3TcpSocket[i]->TraceConnectWithoutContext ("RWND", MakeCallback (&RwndChange));
+		ns3TcpSocket[i]->TraceConnectWithoutContext ("RTT", MakeCallback (&RttChange));
 		ns3TcpSocket[i]->SetAttribute("SegmentSize", UintegerValue(alpha[i]));
 		ns3TcpSocket[i]->SetAttribute("SlowStartThreshold", UintegerValue(beta[i]));
 	
 		/// setup the data-sending apps on sender nodes
 		app[i] = CreateObject<MyApp> ();
 		//app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 100000, DataRate ("5Mbps"));
-		app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 10000, DataRate ("3Mbps"));
+		app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 10000, DataRate ("4Mbps"));
 		csmaNodesSend.Get (i + 1)->AddApplication (app[i]);
 		app[i]->SetStartTime (Seconds (0.));
 		app[i]->SetStopTime (Seconds (SIMTIME));
