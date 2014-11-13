@@ -42,6 +42,7 @@ NS_LOG_COMPONENT_DEFINE ("CWnd");
 
 // global variable for CWnds
 uint32_t cwnds[NUM];
+//double rtts[NUM];
 
 class MyApp : public Application 
 {
@@ -163,6 +164,13 @@ static void CwndChange (uint32_t oldCwnd, uint32_t newCwnd)
 	// GetContext is used to find a NodeId of a node that triggered the event
 	int num = Simulator::GetContext () - 1;
 	NS_LOG_UNCOND ("Sender " << num << " " << Simulator::Now ().GetSeconds () << "\t" << newCwnd);
+	/*if(newCwnd > oldCwnd) {
+		rtts[num-1] = Simulator::Now().GetSeconds() - rtts[num-1];
+		if(rtts[num-1] != 0) {
+			NS_LOG_UNCOND ("Approx. throughput " << num << " " << Simulator::Now ().GetSeconds () << "\t" 
+					<< oldCwnd / rtts[num-1] * 8 / 1024 / 1024);
+		}
+		}*/
 	cwnds[num - 1] = newCwnd;
 	/*TypeId tid = TypeId::LookupByName ("ns3::TcpReno");
 	std::stringstream nodeId;
@@ -221,7 +229,7 @@ main (int argc, char *argv[])
 	// bottleneck link
 	PointToPointHelper pointToPoint;
 	//pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("7Mbps"));
-	pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("8Mbps"));
+	pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("15Mbps"));
 	//pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
 	CsmaHelper csmaHelperSend, csmaHelperReceive;
 	//csmaHelper.SetChannelAttribute ("DataRate", DataRateValue (DataRate (5000000)));
@@ -267,7 +275,7 @@ main (int argc, char *argv[])
 	ApplicationContainer sinkApps[NUM];
 	PacketSinkHelper *packetSinkHelper[NUM];
 
-	TypeId tid = TypeId::LookupByName ("ns3::TcpNewReno");
+	TypeId tid = TypeId::LookupByName ("ns3::TcpTahoe");
 	std::stringstream nodeId[NUM];
 	std::string specificNode[NUM];
 	Ptr<Socket> ns3TcpSocket[NUM];
@@ -298,7 +306,7 @@ main (int argc, char *argv[])
 		/// setup the data-sending apps on sender nodes
 		app[i] = CreateObject<MyApp> ();
 		//app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 100000, DataRate ("5Mbps"));
-		app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 10000, DataRate ("4Mbps"));
+		app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 10000, DataRate ("5Mbps"));
 		csmaNodesSend.Get (i + 1)->AddApplication (app[i]);
 		app[i]->SetStartTime (Seconds (0.));
 		app[i]->SetStopTime (Seconds (SIMTIME));
