@@ -46,9 +46,9 @@ uint32_t cwnds[NUM];
 static void CwndChange (uint32_t oldCwnd, uint32_t newCwnd)
 {
 	// GetContext is used to find a NodeId of a node that triggered the event
-	int num = Simulator::GetContext () - 1;
-	NS_LOG_UNCOND ("Sender " << num << " " << Simulator::Now ().GetSeconds () << "\t" << newCwnd);
-	cwnds[num - 1] = newCwnd;
+	//int num = Simulator::GetContext () - 1;
+	NS_LOG_UNCOND ("Sender 1" << " " << Simulator::Now ().GetSeconds () << "\t" << newCwnd);
+	//cwnds[num - 1] = newCwnd;
 }
 
 static void RttChange (Time oldRtt, Time newRtt)
@@ -64,9 +64,9 @@ main (int argc, char *argv[])
 {
 	uint32_t alpha[NUM], beta[NUM];
 	int i = 0;
-	char buf_a[7];
-	char buf_b[6];
-	CommandLine cmd;
+	//char buf_a[7];
+	//char buf_b[6];
+	/*CommandLine cmd;
 
 	for(i = 0; i < NUM; i++)
 	{
@@ -76,7 +76,13 @@ main (int argc, char *argv[])
 		cmd.AddValue(buf_b, buf_b, beta[i]);
 		cwnds[i] = 0;
 	}
-	cmd.Parse(argc, argv);
+	cmd.Parse(argc, argv);*/
+	alpha[0] = 1000;
+	alpha[1] = 2000;
+	alpha[2] = 3000;
+	beta[0] = 0;
+	beta[1] = 0;
+	beta[2] = 0;
 
 	NodeContainer p2pNodes, csmaNodesSend, csmaNodesReceive;
 	p2pNodes.Create (2);
@@ -173,6 +179,9 @@ main (int argc, char *argv[])
 	BulkSendHelper source1 ("ns3::TcpSocketFactory", InetSocketAddress (csmaInterfacesSend.GetAddress (1), sinkPort));
 	source1.SetAttribute ("MaxBytes", UintegerValue (10000));
 	ApplicationContainer sourceApps1 = source1.Install (csmaNodesSend.Get (1));
+	Ptr<BulkSendApplication> app1 = DynamicCast<BulkSendApplication> (sourceApps1.Get(0));
+	Ptr<Socket> sock = app1->GetSocket();	
+	//sock->TraceConnectWithoutContext ("CongestionWindow", MakeCallback (&CwndChange));
 	sourceApps1.Start (Seconds (0.0));
 	sourceApps1.Stop (Seconds (SIMTIME));
 
