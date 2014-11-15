@@ -17,6 +17,6 @@ set terminal png size 1024,768
 set output 'pics/3/tp-result.png'
 plot "data/3/tp-$1-$2.dat" using 1:2 title "$1-$2" with linespoints lt 1 pt 0, "data/3/tp-$3-$4.dat" using 1:2 title "$3-$4" with linespoints lt 3 pt 0, "data/3/tp-$5-$6.dat" using 1:2 title "$5-$6" with linespoints lt 5 pt 0
 __EOF
-cp pics/3/result.png pics/3/$1,$2-$3,$4-$5,$6.png
-cp pics/3/tp-result.png pics/3/tp-$1,$2-$3,$4-$5,$6.png
+cp pics/3/result.png pics/3_1/$1,$2-$3,$4-$5,$6.png
+cp pics/3/tp-result.png pics/3_1/tp-$1,$2-$3,$4-$5,$6.png
 cp goodput.dat data/3/goodput-$1,$2-$3,$4-$5,$6.dat

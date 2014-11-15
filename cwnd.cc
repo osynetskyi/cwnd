@@ -31,7 +31,7 @@
 #include "ns3/double.h"
 
 // simulation time
-#define SIMTIME 170
+#define SIMTIME 100
 
 // number of different strategies
 #define NUM 3
@@ -85,7 +85,6 @@ MyApp::MyApp ()
 MyApp::~MyApp()
 {
 	m_socket = 0;
-	Application::DoDispose ();
 }
 
 double MyApp::getTotalTime() 
@@ -126,7 +125,7 @@ void MyApp::Setup (Ptr<Socket> socket, Address address, uint32_t packetSize, uin
           m_socket->Bind6 ();
         }
       else if (InetSocketAddress::IsMatchingType (m_peer))
-        {
+       {
           m_socket->Bind ();
         }
 
@@ -164,17 +163,16 @@ void MyApp::StartApplication (void)
 
 void MyApp::StopApplication (void) // Called at time specified by Stop
 {
-  NS_LOG_FUNCTION (this);
+  	m_running = false;
+	if (m_stopTime == 0) 
+	{
+		m_stopTime = Simulator::Now ().GetSeconds ();
+	}
 
-  if (m_socket != 0)
-    {
-      m_socket->Close ();
-      m_running = false;
-    }
-  else
-    {
-      NS_LOG_WARN ("BulkSendApplication found null socket to close in StopApplication");
-    }
+	if (m_socket)
+	{
+		m_socket->Close ();
+	}
 }
 
 void MyApp::SendData (void)
@@ -328,7 +326,7 @@ main (int argc, char *argv[])
 {
 	uint32_t alpha[NUM], beta[NUM];
 	int i = 0;
-	/*char buf_a[7];
+	char buf_a[7];
 	char buf_b[6];
 	CommandLine cmd;
 
@@ -340,14 +338,14 @@ main (int argc, char *argv[])
 		cmd.AddValue(buf_b, buf_b, beta[i]);
 		cwnds[i] = 0;
 	}
-	cmd.Parse(argc, argv);*/
+	cmd.Parse(argc, argv);
 
-	alpha[0] = 1000;
+	/*alpha[0] = 1000;
 	alpha[1] = 2000;
 	alpha[2] = 3000;
 	beta[0] = 0;
 	beta[1] = 0;
-	beta[2] = 0;
+	beta[2] = 0;*/
 
 	NodeContainer p2pNodes, csmaNodesSend, csmaNodesReceive;
 	p2pNodes.Create (2);
@@ -362,7 +360,7 @@ main (int argc, char *argv[])
 	pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("8Mbps"));
 	//pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
 	CsmaHelper csmaHelperSend, csmaHelperReceive;
-	//csmaHelper.SetChannelAttribute ("DataRate", DataRateValue (DataRate (5000000)));
+	//csmaHelper.SetChannelAttribute ("DataRate", StringValue ("10Mbps"));
 	//csmaHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (2)));
 	//csmaHelper.SetDeviceAttribute ("Mtu", UintegerValue (9000));
 
@@ -437,7 +435,7 @@ main (int argc, char *argv[])
 		app[i] = CreateObject<MyApp> ();
 		//app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 100000, DataRate ("5Mbps"));
 		//app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 10000, DataRate ("4Mbps"));
-		app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 10000);
+		app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 1000000);
 		csmaNodesSend.Get (i + 1)->AddApplication (app[i]);
 		app[i]->SetStartTime (Seconds (0.));
 		app[i]->SetStopTime (Seconds (SIMTIME));
