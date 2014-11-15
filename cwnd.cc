@@ -49,24 +49,24 @@ class MyApp : public Application
 		MyApp ();
 		virtual ~MyApp();
 		
-		void Setup (Ptr<Socket> socket, Address address, uint32_t packetSize, uint32_t nPackets, DataRate dataRate);
+		void Setup (Ptr<Socket> socket, Address address, uint32_t packetSize, uint32_t maxBytes);
 		double getTotalTime();
+		void SendData ();
+		void DataSend (Ptr<Socket>, uint32_t);
+		void ConnectionSucceeded(Ptr<Socket>);
+		void ConnectionFailed(Ptr<Socket>);
 
 	private:
 		virtual void StartApplication (void);
 		virtual void StopApplication (void);
 
-		void ScheduleTx (void);
-		void SendPacket (void);
-
 	Ptr<Socket>     m_socket;
 	Address         m_peer;
 	uint32_t        m_packetSize;
-	uint32_t        m_nPackets;
-	DataRate        m_dataRate;
+	uint32_t		m_maxBytes;
+	uint32_t		m_totBytes;
 	EventId         m_sendEvent;
 	bool            m_running;
-	uint32_t        m_packetsSent;
 	double 			m_startTime;
 	double 			m_stopTime;
 };
@@ -74,12 +74,9 @@ class MyApp : public Application
 MyApp::MyApp ()
 	: m_socket (0), 
 	m_peer (), 
-	m_packetSize (0), 
-	m_nPackets (0), 
-	m_dataRate (0), 
+	m_totBytes (0), 
 	m_sendEvent (), 
 	m_running (false), 
-	m_packetsSent (0),
 	m_startTime (0),
 	m_stopTime (0)
 {
@@ -88,6 +85,7 @@ MyApp::MyApp ()
 MyApp::~MyApp()
 {
 	m_socket = 0;
+	Application::DoDispose ();
 }
 
 double MyApp::getTotalTime() 
@@ -95,26 +93,159 @@ double MyApp::getTotalTime()
 	return m_stopTime - m_startTime;
 }
 
-void MyApp::Setup (Ptr<Socket> socket, Address address, uint32_t packetSize, 
-					uint32_t nPackets, DataRate dataRate)
+void MyApp::Setup (Ptr<Socket> socket, Address address, uint32_t packetSize, uint32_t maxBytes)
 {
 	m_socket = socket;
 	m_peer = address;
 	m_packetSize = packetSize;
-	m_nPackets = nPackets;
-	m_dataRate = dataRate;
+	m_maxBytes = maxBytes;
 	m_startTime = 0;
 	m_stopTime = 0;
 }
 
+/*void MyApp::StartApplication (void) 
+{
+  NS_LOG_FUNCTION (this);
+
+  // Create the socket if not already
+  if (!m_socket)
+    {
+      m_socket = Socket::CreateSocket (GetNode (), m_tid);
+
+      // Fatal error if socket type is not NS3_SOCK_STREAM or NS3_SOCK_SEQPACKET
+      if (m_socket->GetSocketType () != Socket::NS3_SOCK_STREAM &&
+          m_socket->GetSocketType () != Socket::NS3_SOCK_SEQPACKET)
+        {
+          NS_FATAL_ERROR ("Using BulkSend with an incompatible socket type. "
+                          "BulkSend requires SOCK_STREAM or SOCK_SEQPACKET. "
+                          "In other words, use TCP instead of UDP.");
+        }
+
+      if (Inet6SocketAddress::IsMatchingType (m_peer))
+        {
+          m_socket->Bind6 ();
+        }
+      else if (InetSocketAddress::IsMatchingType (m_peer))
+        {
+          m_socket->Bind ();
+        }
+
+      m_socket->Connect (m_peer);
+      m_socket->ShutdownRecv ();
+      m_socket->SetConnectCallback (
+        MakeCallback (&BulkSendApplication::ConnectionSucceeded, this),
+        MakeCallback (&BulkSendApplication::ConnectionFailed, this));
+      m_socket->SetSendCallback (
+        MakeCallback (&BulkSendApplication::DataSend, this));
+    }
+  if (m_connected)
+    {
+      SendData ();
+    }
+}*/
+
 void MyApp::StartApplication (void)
 {
 	m_running = true;
-	m_packetsSent = 0;
+	m_totBytes = 0;
+	m_startTime = Simulator::Now ().GetSeconds ();
+	m_socket->Connect (m_peer);
+    m_socket->ShutdownRecv ();
+    m_socket->SetConnectCallback (
+    	MakeCallback (&MyApp::ConnectionSucceeded, this),
+    	MakeCallback (&MyApp::ConnectionFailed, this));
+    m_socket->SetSendCallback (
+        MakeCallback (&MyApp::DataSend, this));
+  if (m_running)
+    {
+      SendData ();
+    }
+}
+
+void MyApp::StopApplication (void) // Called at time specified by Stop
+{
+  NS_LOG_FUNCTION (this);
+
+  if (m_socket != 0)
+    {
+      m_socket->Close ();
+      m_running = false;
+    }
+  else
+    {
+      NS_LOG_WARN ("BulkSendApplication found null socket to close in StopApplication");
+    }
+}
+
+void MyApp::SendData (void)
+{
+  NS_LOG_FUNCTION (this);
+
+  while (m_maxBytes == 0 || m_totBytes < m_maxBytes)
+    { // Time to send more
+      uint32_t toSend = m_packetSize;
+      // Make sure we don't send too many
+      if (m_maxBytes > 0)
+        {
+          toSend = std::min (m_packetSize, m_maxBytes - m_totBytes);
+        }
+      NS_LOG_LOGIC ("sending packet at " << Simulator::Now ());
+      Ptr<Packet> packet = Create<Packet> (toSend);
+      //m_txTrace (packet);
+      int actual = m_socket->Send (packet);
+      if (actual > 0)
+        {
+          m_totBytes += actual;
+        }
+      // We exit this loop when actual < toSend as the send side
+      // buffer is full. The "DataSent" callback will pop when
+      // some buffer space has freed ip.
+      if ((unsigned)actual != toSend)
+        {
+          break;
+        }
+    }
+  // Check if time to close (all sent)
+  if (m_totBytes == m_maxBytes && m_running)
+    {
+      StopApplication();
+    }
+}
+
+void MyApp::ConnectionSucceeded (Ptr<Socket> socket)
+{
+  NS_LOG_FUNCTION (this << socket);
+  NS_LOG_LOGIC ("Connection succeeded");
+  m_running = true;
+  SendData ();
+}
+
+void MyApp::ConnectionFailed (Ptr<Socket> socket)
+{
+  NS_LOG_FUNCTION (this << socket);
+  NS_LOG_LOGIC ("Connection Failed");
+}
+
+void MyApp::DataSend (Ptr<Socket>, uint32_t)
+{
+  NS_LOG_FUNCTION (this);
+
+  if (m_running)
+    { // Only send new data if the connection has completed
+      Simulator::ScheduleNow (&MyApp::SendData, this);
+    }
+}
+
+
+
+/*void MyApp::StartApplication (void)
+{
+	m_running = true;
+	m_totBytes = 0;
 	m_startTime = Simulator::Now ().GetSeconds ();
 	m_socket->Bind ();
 	m_socket->Connect (m_peer);
-	SendPacket ();
+	SendData ();
 }
 
 void MyApp::StopApplication (void)
@@ -156,7 +287,7 @@ void MyApp::ScheduleTx (void)
 		Time tNext (Seconds (m_packetSize * 8 / static_cast<double> (m_dataRate.GetBitRate ())));
 		m_sendEvent = Simulator::Schedule (tNext, &MyApp::SendPacket, this);
 	}
-}
+}*/
 
 static void CwndChange (uint32_t oldCwnd, uint32_t newCwnd)
 {
@@ -197,7 +328,7 @@ main (int argc, char *argv[])
 {
 	uint32_t alpha[NUM], beta[NUM];
 	int i = 0;
-	char buf_a[7];
+	/*char buf_a[7];
 	char buf_b[6];
 	CommandLine cmd;
 
@@ -209,7 +340,14 @@ main (int argc, char *argv[])
 		cmd.AddValue(buf_b, buf_b, beta[i]);
 		cwnds[i] = 0;
 	}
-	cmd.Parse(argc, argv);
+	cmd.Parse(argc, argv);*/
+
+	alpha[0] = 1000;
+	alpha[1] = 2000;
+	alpha[2] = 3000;
+	beta[0] = 0;
+	beta[1] = 0;
+	beta[2] = 0;
 
 	NodeContainer p2pNodes, csmaNodesSend, csmaNodesReceive;
 	p2pNodes.Create (2);
@@ -298,7 +436,8 @@ main (int argc, char *argv[])
 		/// setup the data-sending apps on sender nodes
 		app[i] = CreateObject<MyApp> ();
 		//app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 100000, DataRate ("5Mbps"));
-		app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 10000, DataRate ("4Mbps"));
+		//app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 10000, DataRate ("4Mbps"));
+		app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 10000);
 		csmaNodesSend.Get (i + 1)->AddApplication (app[i]);
 		app[i]->SetStartTime (Seconds (0.));
 		app[i]->SetStopTime (Seconds (SIMTIME));
