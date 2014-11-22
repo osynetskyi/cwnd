@@ -213,9 +213,9 @@ static void CwndChange (uint32_t oldCwnd, uint32_t newCwnd)
 static void RttChange (Time oldRtt, Time newRtt)
 {
 	int num = Simulator::GetContext () - 1;
-	NS_LOG_UNCOND ("Rtt " << num << " " << newRtt.GetSeconds());
+	NS_LOG_UNCOND ("Rtt " << num << " " << newRtt.GetSeconds() << " relevant cwnd: " << cwnds[num-1]);
 	NS_LOG_UNCOND ("Approx. throughput " << num << " " << Simulator::Now ().GetSeconds () << "\t" 
-					<< cwnds[num-1] / newRtt.GetSeconds() * 8 / 1024 / 1024);
+					<< cwnds[num-1] / newRtt.GetSeconds() * 8 / 1024/* / 1024*/);
 }
 
 static void Drop (Ptr<const Packet> p)
@@ -227,6 +227,7 @@ int
 main (int argc, char *argv[])
 {
 	LogComponentEnable ("PacketSink", LOG_LEVEL_INFO);
+	LogComponentEnable ("TcpNewReno", LOG_LEVEL_LOGIC);
 	//LogComponentEnable ("CWnd", LOG_LEVEL_INFO);
 
 	uint32_t alpha[NUM], beta[NUM];
@@ -262,7 +263,7 @@ main (int argc, char *argv[])
 	// bottleneck link
 	PointToPointHelper pointToPoint;
 	//pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("7Mbps"));
-	pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("1Mbps"));
+	pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("10Kbps"));
 	//pointToPoint.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (100)));
 	//pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
 	CsmaHelper csmaHelperSend, csmaHelperReceive;
@@ -341,7 +342,7 @@ main (int argc, char *argv[])
 		app[i] = CreateObject<MyApp> ();
 		//app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 100000, DataRate ("5Mbps"));
 		//app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 10000, DataRate ("4Mbps"));
-		app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 4000000);
+		app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 1600000);
 		csmaNodesSend.Get (i + 1)->AddApplication (app[i]);
 		app[i]->SetStartTime (Seconds (0.));
 		app[i]->SetStopTime (Seconds (SIMTIME));
