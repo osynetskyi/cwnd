@@ -29,12 +29,13 @@
 #include "ns3/string.h"
 #include "ns3/pointer.h"
 #include "ns3/double.h"
+#include "ns3/flow-monitor-module.h"
 
 // simulation time
 #define SIMTIME 100
 
 // number of different strategies
-#define NUM 3
+#define NUM 2
 
 using namespace ns3;
 
@@ -102,47 +103,6 @@ void MyApp::Setup (Ptr<Socket> socket, Address address, uint32_t packetSize, uin
 	m_stopTime = 0;
 }
 
-/*void MyApp::StartApplication (void) 
-{
-  NS_LOG_FUNCTION (this);
-
-  // Create the socket if not already
-  if (!m_socket)
-    {
-      m_socket = Socket::CreateSocket (GetNode (), m_tid);
-
-      // Fatal error if socket type is not NS3_SOCK_STREAM or NS3_SOCK_SEQPACKET
-      if (m_socket->GetSocketType () != Socket::NS3_SOCK_STREAM &&
-          m_socket->GetSocketType () != Socket::NS3_SOCK_SEQPACKET)
-        {
-          NS_FATAL_ERROR ("Using BulkSend with an incompatible socket type. "
-                          "BulkSend requires SOCK_STREAM or SOCK_SEQPACKET. "
-                          "In other words, use TCP instead of UDP.");
-        }
-
-      if (Inet6SocketAddress::IsMatchingType (m_peer))
-        {
-          m_socket->Bind6 ();
-        }
-      else if (InetSocketAddress::IsMatchingType (m_peer))
-       {
-          m_socket->Bind ();
-        }
-
-      m_socket->Connect (m_peer);
-      m_socket->ShutdownRecv ();
-      m_socket->SetConnectCallback (
-        MakeCallback (&BulkSendApplication::ConnectionSucceeded, this),
-        MakeCallback (&BulkSendApplication::ConnectionFailed, this));
-      m_socket->SetSendCallback (
-        MakeCallback (&BulkSendApplication::DataSend, this));
-    }
-  if (m_connected)
-    {
-      SendData ();
-    }
-}*/
-
 void MyApp::StartApplication (void)
 {
 	m_running = true;
@@ -161,7 +121,7 @@ void MyApp::StartApplication (void)
     }
 }
 
-void MyApp::StopApplication (void) // Called at time specified by Stop
+void MyApp::StopApplication (void) 
 {
   	m_running = false;
 	if (m_stopTime == 0) 
@@ -180,30 +140,25 @@ void MyApp::SendData (void)
   NS_LOG_FUNCTION (this);
 
   while (m_maxBytes == 0 || m_totBytes < m_maxBytes)
-    { // Time to send more
+    {
       uint32_t toSend = m_packetSize;
-      // Make sure we don't send too many
       if (m_maxBytes > 0)
         {
           toSend = std::min (m_packetSize, m_maxBytes - m_totBytes);
         }
       NS_LOG_LOGIC ("sending packet at " << Simulator::Now ());
       Ptr<Packet> packet = Create<Packet> (toSend);
-      //m_txTrace (packet);
       int actual = m_socket->Send (packet);
       if (actual > 0)
         {
           m_totBytes += actual;
         }
-      // We exit this loop when actual < toSend as the send side
-      // buffer is full. The "DataSent" callback will pop when
-      // some buffer space has freed ip.
+
       if ((unsigned)actual != toSend)
         {
           break;
         }
     }
-  // Check if time to close (all sent)
   if (m_totBytes == m_maxBytes && m_running)
     {
       StopApplication();
@@ -234,59 +189,6 @@ void MyApp::DataSend (Ptr<Socket>, uint32_t)
     }
 }
 
-
-
-/*void MyApp::StartApplication (void)
-{
-	m_running = true;
-	m_totBytes = 0;
-	m_startTime = Simulator::Now ().GetSeconds ();
-	m_socket->Bind ();
-	m_socket->Connect (m_peer);
-	SendData ();
-}
-
-void MyApp::StopApplication (void)
-{
-	m_running = false;
-	if (m_stopTime == 0) 
-	{
-		m_stopTime = Simulator::Now ().GetSeconds ();
-	}
-
-	if (m_sendEvent.IsRunning ())
-	{
-		Simulator::Cancel (m_sendEvent);
-	}
-
-	if (m_socket)
-	{
-		m_socket->Close ();
-	}
-}
-
-void MyApp::SendPacket (void)
-{
-	Ptr<Packet> packet = Create<Packet> (m_packetSize);
-	m_socket->Send (packet);
-
-	if (++m_packetsSent < m_nPackets)
-	{
-		ScheduleTx ();
-	} else {
-		m_stopTime = Simulator::Now ().GetSeconds ();
-	}
-}
-
-void MyApp::ScheduleTx (void)
-{
-	if (m_running)
-	{
-		Time tNext (Seconds (m_packetSize * 8 / static_cast<double> (m_dataRate.GetBitRate ())));
-		m_sendEvent = Simulator::Schedule (tNext, &MyApp::SendPacket, this);
-	}
-}*/
-
 static void CwndChange (uint32_t oldCwnd, uint32_t newCwnd)
 {
 	// GetContext is used to find a NodeId of a node that triggered the event
@@ -316,14 +218,17 @@ static void RttChange (Time oldRtt, Time newRtt)
 					<< cwnds[num-1] / newRtt.GetSeconds() * 8 / 1024 / 1024);
 }
 
-/*static void RxDrop (Ptr<const Packet> p)
+static void Drop (Ptr<const Packet> p)
 {
-	NS_LOG_UNCOND ("RxDrop at " << Simulator::Now ().GetSeconds ());
-}*/
+	NS_LOG_UNCOND ("Drop at " << Simulator::Now ().GetSeconds ());
+}
 
 int 
 main (int argc, char *argv[])
 {
+	LogComponentEnable ("PacketSink", LOG_LEVEL_INFO);
+	//LogComponentEnable ("CWnd", LOG_LEVEL_INFO);
+
 	uint32_t alpha[NUM], beta[NUM];
 	int i = 0;
 	char buf_a[7];
@@ -342,10 +247,10 @@ main (int argc, char *argv[])
 
 	/*alpha[0] = 1000;
 	alpha[1] = 2000;
-	alpha[2] = 3000;
+	//alpha[2] = 3000;
 	beta[0] = 0;
 	beta[1] = 0;
-	beta[2] = 0;*/
+	//beta[2] = 0;*/
 
 	NodeContainer p2pNodes, csmaNodesSend, csmaNodesReceive;
 	p2pNodes.Create (2);
@@ -357,10 +262,11 @@ main (int argc, char *argv[])
 	// bottleneck link
 	PointToPointHelper pointToPoint;
 	//pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("7Mbps"));
-	pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("8Mbps"));
+	pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("1Mbps"));
+	//pointToPoint.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (100)));
 	//pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
 	CsmaHelper csmaHelperSend, csmaHelperReceive;
-	//csmaHelper.SetChannelAttribute ("DataRate", StringValue ("10Mbps"));
+	//csmaHelperSend.SetChannelAttribute ("DataRate", StringValue ("5Mbps"));
 	//csmaHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (2)));
 	//csmaHelper.SetDeviceAttribute ("Mtu", UintegerValue (9000));
 
@@ -435,16 +341,46 @@ main (int argc, char *argv[])
 		app[i] = CreateObject<MyApp> ();
 		//app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 100000, DataRate ("5Mbps"));
 		//app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 10000, DataRate ("4Mbps"));
-		app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 1000000);
+		app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 4000000);
 		csmaNodesSend.Get (i + 1)->AddApplication (app[i]);
 		app[i]->SetStartTime (Seconds (0.));
 		app[i]->SetStopTime (Seconds (SIMTIME));
 	}
+	FlowMonitorHelper flowmon;
+	Ptr<FlowMonitor> monitor = flowmon.InstallAll();
 
-	//csmaDevicesReceive.Get (1)->TraceConnectWithoutContext ("PhyRxDrop", MakeCallback (&RxDrop));
+	/*app[1]->SetStartTime (Seconds (40.));
+	app[2]->SetStartTime (Seconds (80.));*/
+
+	//p2pDevices.Get (1)->TraceConnectWithoutContext ("PhyRxDrop", MakeCallback (&RxDrop));
+	Config::ConnectWithoutContext("/NodeList/*/DeviceList/*/$ns3::NetDevice/Mac/MacTxDrop", MakeCallback(&Drop));
+	Config::ConnectWithoutContext("/NodeList/*/DeviceList/*/$ns3::NetDevice/Phy/PhyRxDrop", MakeCallback(&Drop));
+	Config::ConnectWithoutContext("/NodeList/*/DeviceList/*/$ns3::NetDevice/Phy/PhyTxDrop", MakeCallback(&Drop));
 
 	Simulator::Stop (Seconds (SIMTIME));
 	Simulator::Run ();
+
+	monitor->CheckForLostPackets ();
+	Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier> (flowmon.GetClassifier ());
+	std::map<FlowId, FlowMonitor::FlowStats> stats = monitor->GetFlowStats ();
+
+	for (std::map<FlowId, FlowMonitor::FlowStats>::const_iterator iter = stats.begin (); iter != stats.end (); ++iter)
+    {
+	  Ipv4FlowClassifier::FiveTuple t = classifier->FindFlow (iter->first);
+
+      if ((t.sourceAddress == Ipv4Address("1.1.1.2") && t.destinationAddress == Ipv4Address("3.3.3.2"))
+    	|| (t.sourceAddress == Ipv4Address("1.1.1.3") && t.destinationAddress == Ipv4Address("3.3.3.3"))
+    	|| (t.sourceAddress == Ipv4Address("1.1.1.4") && t.destinationAddress == Ipv4Address("3.3.3.4")))
+        {
+    	  NS_LOG_UNCOND("Flow ID: " << iter->first << " Src Addr " << t.sourceAddress << " Dst Addr " << t.destinationAddress);
+    	  NS_LOG_UNCOND("Tx Packets = " << iter->second.txPackets);
+    	  NS_LOG_UNCOND("Rx Packets = " << iter->second.rxPackets);
+    	  NS_LOG_UNCOND("Throughput: " << iter->second.rxBytes * 8.0 / (iter->second.timeLastRxPacket.GetSeconds()-iter->second.timeFirstTxPacket.GetSeconds()) / 1024  << " Kbps");
+        }
+    }
+	monitor->SerializeToXmlFile("cwnd.flowmon", true, true);
+
+
 	Simulator::Destroy ();
 
 	// finding the goodput and printing it to a file
