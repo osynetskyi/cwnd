@@ -32,7 +32,7 @@
 #include "ns3/flow-monitor-module.h"
 
 // simulation time
-#define SIMTIME 100
+#define SIMTIME 140
 
 // number of different strategies
 #define NUM 2
@@ -215,7 +215,7 @@ static void RttChange (Time oldRtt, Time newRtt)
 	int num = Simulator::GetContext () - 1;
 	NS_LOG_UNCOND ("Rtt " << num << " " << newRtt.GetSeconds() << " relevant cwnd: " << cwnds[num-1]);
 	NS_LOG_UNCOND ("Approx. throughput " << num << " " << Simulator::Now ().GetSeconds () << "\t" 
-					<< cwnds[num-1] / newRtt.GetSeconds() * 8 / 1024/* / 1024*/);
+					<< cwnds[num-1] / newRtt.GetSeconds() * 8 / 1000/* / 1024*/);
 }
 
 static void Drop (Ptr<const Packet> p)
@@ -227,7 +227,7 @@ int
 main (int argc, char *argv[])
 {
 	LogComponentEnable ("PacketSink", LOG_LEVEL_INFO);
-	LogComponentEnable ("TcpNewReno", LOG_LEVEL_LOGIC);
+	LogComponentEnable ("TcpTahoe", LOG_LEVEL_LOGIC);
 	//LogComponentEnable ("CWnd", LOG_LEVEL_INFO);
 
 	uint32_t alpha[NUM], beta[NUM];
@@ -263,10 +263,14 @@ main (int argc, char *argv[])
 	// bottleneck link
 	PointToPointHelper pointToPoint;
 	//pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("7Mbps"));
-	pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("10Kbps"));
+	pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("1Mbps"));
 	//pointToPoint.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (100)));
 	//pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
 	CsmaHelper csmaHelperSend, csmaHelperReceive;
+
+	/*CsmaHelper::SetQueue("ns3::RedQueue", 
+                     "Mode", StringValue("QUEUE_MODE_BYTES"), 
+                     "QueueLimit", StringValue("10MB"));*/
 	//csmaHelperSend.SetChannelAttribute ("DataRate", StringValue ("5Mbps"));
 	//csmaHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (2)));
 	//csmaHelper.SetDeviceAttribute ("Mtu", UintegerValue (9000));
@@ -275,6 +279,10 @@ main (int argc, char *argv[])
 	p2pDevices = pointToPoint.Install (p2pNodes);
 	csmaDevicesSend = csmaHelperSend.Install (csmaNodesSend);
 	csmaDevicesReceive = csmaHelperReceive.Install (csmaNodesReceive);
+
+	//Config::Set("/NodeList/0/DeviceList/*/TxQueue/MaxBytes", UintegerValue(6553500));
+	Config::Set("/NodeList/0/DeviceList/*/TxQueue/MaxPackets", UintegerValue(25));
+	Config::Set("/NodeList/1/DeviceList/*/TxQueue/MaxPackets", UintegerValue(1));
 
 	InternetStackHelper stack;
 	/*InternetStackHelper stack2;
@@ -310,7 +318,7 @@ main (int argc, char *argv[])
 	ApplicationContainer sinkApps[NUM];
 	PacketSinkHelper *packetSinkHelper[NUM];
 
-	TypeId tid = TypeId::LookupByName ("ns3::TcpNewReno");
+	TypeId tid = TypeId::LookupByName ("ns3::TcpTahoe");
 	std::stringstream nodeId[NUM];
 	std::string specificNode[NUM];
 	Ptr<Socket> ns3TcpSocket[NUM];
@@ -342,7 +350,7 @@ main (int argc, char *argv[])
 		app[i] = CreateObject<MyApp> ();
 		//app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 100000, DataRate ("5Mbps"));
 		//app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 10000, DataRate ("4Mbps"));
-		app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 1600000);
+		app[i]->Setup (ns3TcpSocket[i], sinkAddress[i], 1040, 8000000);
 		csmaNodesSend.Get (i + 1)->AddApplication (app[i]);
 		app[i]->SetStartTime (Seconds (0.));
 		app[i]->SetStopTime (Seconds (SIMTIME));
@@ -353,7 +361,7 @@ main (int argc, char *argv[])
 	/*app[1]->SetStartTime (Seconds (40.));
 	app[2]->SetStartTime (Seconds (80.));*/
 
-	//p2pDevices.Get (1)->TraceConnectWithoutContext ("PhyRxDrop", MakeCallback (&RxDrop));
+	p2pDevices.Get (0)->TraceConnectWithoutContext ("PhyRxDrop", MakeCallback (&Drop));
 	Config::ConnectWithoutContext("/NodeList/*/DeviceList/*/$ns3::NetDevice/Mac/MacTxDrop", MakeCallback(&Drop));
 	Config::ConnectWithoutContext("/NodeList/*/DeviceList/*/$ns3::NetDevice/Phy/PhyRxDrop", MakeCallback(&Drop));
 	Config::ConnectWithoutContext("/NodeList/*/DeviceList/*/$ns3::NetDevice/Phy/PhyTxDrop", MakeCallback(&Drop));
@@ -376,7 +384,7 @@ main (int argc, char *argv[])
     	  NS_LOG_UNCOND("Flow ID: " << iter->first << " Src Addr " << t.sourceAddress << " Dst Addr " << t.destinationAddress);
     	  NS_LOG_UNCOND("Tx Packets = " << iter->second.txPackets);
     	  NS_LOG_UNCOND("Rx Packets = " << iter->second.rxPackets);
-    	  NS_LOG_UNCOND("Throughput: " << iter->second.rxBytes * 8.0 / (iter->second.timeLastRxPacket.GetSeconds()-iter->second.timeFirstTxPacket.GetSeconds()) / 1024  << " Kbps");
+    	  NS_LOG_UNCOND("Throughput: " << iter->second.rxBytes * 8.0 / (iter->second.timeLastRxPacket.GetSeconds()-iter->second.timeFirstTxPacket.GetSeconds()) / 1000  << " Kbps");
         }
     }
 	monitor->SerializeToXmlFile("cwnd.flowmon", true, true);
