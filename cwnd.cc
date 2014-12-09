@@ -230,20 +230,22 @@ main (int argc, char *argv[])
 	LogComponentEnable ("TcpTahoe", LOG_LEVEL_LOGIC);
 	//LogComponentEnable ("CWnd", LOG_LEVEL_INFO);
 
-	uint32_t alpha[NUM], beta[NUM];
+	uint32_t alpha[NUM];//, beta[NUM];
+	uint32_t bufsize;
 	int i = 0;
 	char buf_a[7];
-	char buf_b[6];
+	//char buf_b[6];
 	CommandLine cmd;
 
 	for(i = 0; i < NUM; i++)
 	{
 		sprintf(buf_a, "alpha_%d", i + 1);
 		cmd.AddValue(buf_a, buf_a, alpha[i]);		
-		sprintf(buf_b, "beta_%d", i + 1);		
-		cmd.AddValue(buf_b, buf_b, beta[i]);
+		/*sprintf(buf_b, "beta_%d", i + 1);		
+		cmd.AddValue(buf_b, buf_b, beta[i]);*/
 		cwnds[i] = 0;
 	}
+	cmd.AddValue("bufsize", "bufsize", bufsize);
 	cmd.Parse(argc, argv);
 
 	/*alpha[0] = 1000;
@@ -281,8 +283,9 @@ main (int argc, char *argv[])
 	csmaDevicesReceive = csmaHelperReceive.Install (csmaNodesReceive);
 
 	//Config::Set("/NodeList/0/DeviceList/*/TxQueue/MaxBytes", UintegerValue(6553500));
-	Config::Set("/NodeList/0/DeviceList/*/TxQueue/MaxPackets", UintegerValue(25));
-	Config::Set("/NodeList/1/DeviceList/*/TxQueue/MaxPackets", UintegerValue(1));
+	//Config::Set("/NodeList/0/DeviceList/*/TxQueue/MaxPackets", UintegerValue(25));
+	Config::Set("/NodeList/0/DeviceList/*/TxQueue/MaxPackets", UintegerValue(bufsize));
+	//Config::Set("/NodeList/1/DeviceList/*/TxQueue/MaxPackets", UintegerValue(1));
 
 	InternetStackHelper stack;
 	/*InternetStackHelper stack2;
@@ -344,7 +347,7 @@ main (int argc, char *argv[])
 		//ns3TcpSocket[i]->TraceConnectWithoutContext ("RWND", MakeCallback (&RwndChange));
 		ns3TcpSocket[i]->TraceConnectWithoutContext ("RTT", MakeCallback (&RttChange));
 		ns3TcpSocket[i]->SetAttribute("SegmentSize", UintegerValue(alpha[i]));
-		ns3TcpSocket[i]->SetAttribute("SlowStartThreshold", UintegerValue(beta[i]));
+		//ns3TcpSocket[i]->SetAttribute("SlowStartThreshold", UintegerValue(beta[i]));
 	
 		/// setup the data-sending apps on sender nodes
 		app[i] = CreateObject<MyApp> ();
