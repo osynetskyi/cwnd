@@ -321,7 +321,8 @@ main (int argc, char *argv[])
 	ApplicationContainer sinkApps[NUM];
 	PacketSinkHelper *packetSinkHelper[NUM];
 
-	TypeId tid = TypeId::LookupByName ("ns3::TcpTahoe");
+	//TypeId tid = TypeId::LookupByName ("ns3::TcpTahoe");
+	TypeId tid = TypeId::LookupByName ("ns3::TcpAIMD");
 	std::stringstream nodeId[NUM];
 	std::string specificNode[NUM];
 	Ptr<Socket> ns3TcpSocket[NUM];
@@ -347,7 +348,9 @@ main (int argc, char *argv[])
 		//ns3TcpSocket[i]->TraceConnectWithoutContext ("RWND", MakeCallback (&RwndChange));
 		ns3TcpSocket[i]->TraceConnectWithoutContext ("RTT", MakeCallback (&RttChange));
 		ns3TcpSocket[i]->SetAttribute("SegmentSize", UintegerValue(alpha[i]));
-		//ns3TcpSocket[i]->SetAttribute("SlowStartThreshold", UintegerValue(beta[i]));
+		//ns3TcpSocket[i]->SetAttribute("SlowStartThreshold", UintegerValue(15000));
+		//ns3TcpSocket[i]->SetAttribute("SlowStartThreshold", UintegerValue(11000));
+		ns3TcpSocket[i]->SetAttribute("SlowStartThreshold", UintegerValue(0));
 	
 		/// setup the data-sending apps on sender nodes
 		app[i] = CreateObject<MyApp> ();
@@ -358,6 +361,12 @@ main (int argc, char *argv[])
 		app[i]->SetStartTime (Seconds (0.));
 		app[i]->SetStopTime (Seconds (SIMTIME));
 	}
+
+	ns3TcpSocket[0]->SetAttribute("Alpha", UintegerValue(1000));
+	ns3TcpSocket[0]->SetAttribute("Beta", UintegerValue(2));
+	ns3TcpSocket[1]->SetAttribute("Alpha", UintegerValue(2000));
+	ns3TcpSocket[1]->SetAttribute("Beta", UintegerValue(3));
+
 	FlowMonitorHelper flowmon;
 	Ptr<FlowMonitor> monitor = flowmon.InstallAll();
 
