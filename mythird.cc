@@ -55,7 +55,7 @@ Ipv4AddressHelper address;
 Ipv4InterfaceContainer p2pInterfaces, csmaInterfacesSend, csmaInterfacesReceive;
 FlowMonitorHelper flowmon;
 Ptr<FlowMonitor> monitor;
-const char *algs[4] = {"ns3::TcpWestwood", "ns3::TcpReno", "ns3::TcpTahoe", "ns3::TcpNewReno"};
+const char *algs[4] = {"ns3::TcpTahoe", "ns3::TcpReno", "ns3::TcpNewReno", "ns3::TcpWestwood"};
 
 NS_LOG_COMPONENT_DEFINE ("Arbiter");
 
@@ -124,6 +124,9 @@ void MyApp::Setup (Ptr<Socket> socket, Address address, uint32_t packetSize, uin
 
 void MyApp::StartApplication (void)
 {
+	for (int i = 0; i < NUM; i++) {
+		cwnds[i] = 0;
+	}
 	m_running = true;
 	m_totBytes = 0;
 	m_startTime = Simulator::Now ().GetSeconds ();
@@ -211,17 +214,35 @@ void MyApp::DataSend (Ptr<Socket>, uint32_t)
 static void CwndChange (uint32_t oldCwnd, uint32_t newCwnd)
 {
 	// GetContext is used to find a NodeId of a node that triggered the event
+	int exp = 1;	
+	double cur_time = Simulator::Now().GetSeconds();
+	if (cur_time > 450) {
+		exp = 4;
+	} else if (cur_time > 300) {
+		exp = 3;
+	} else if (cur_time > 150) {
+		exp = 2;
+	}
 	int num = Simulator::GetContext () - 1;
-	//NS_LOG_UNCOND ("Sender " << num << " " << Simulator::Now ().GetSeconds () << "\t" << newCwnd);
+	NS_LOG_UNCOND ("Exp" << exp << " Sender " << num << " " << cur_time << "\t" << newCwnd);
 	cwnds[num - 1] = newCwnd;
 }
 
 static void RttChange (Time oldRtt, Time newRtt)
 {
-	//int num = Simulator::GetContext () - 1;
-	//NS_LOG_UNCOND ("Rtt " << num << " " << newRtt.GetSeconds() << " relevant cwnd: " << cwnds[num-1]);
-	//NS_LOG_UNCOND ("Approx. throughput " << num << " " << Simulator::Now ().GetSeconds () << "\t" 
-					//<< cwnds[num-1] / newRtt.GetSeconds() * 8 / 1000/* / 1024*/);
+	int exp = 1;	
+	double cur_time = Simulator::Now().GetSeconds();
+	if (cur_time > 450) {
+		exp = 4;
+	} else if (cur_time > 300) {
+		exp = 3;
+	} else if (cur_time > 150) {
+		exp = 2;
+	}
+	int num = Simulator::GetContext () - 1;
+	NS_LOG_UNCOND ("Rtt " << num << " " << newRtt.GetSeconds() << " relevant cwnd: " << cwnds[num-1]);
+	NS_LOG_UNCOND ("Exp" << exp << " Approx. throughput " << num << " " << Simulator::Now ().GetSeconds () << "\t" 
+					<< cwnds[num-1] / newRtt.GetSeconds() * 8 / 1000);
 }
 
 /*static void Drop (Ptr<const Packet> p)
@@ -256,11 +277,11 @@ public:
 
 private:
 	int iteration;
-	double thp[4];
+	double thp[NUMPROTO];
 
   	void StartApplication (void) {
   
-	p2pNodes.Create (2);
+	/*p2pNodes.Create (2);
 	csmaNodesSend.Add(p2pNodes.Get (0));
 	csmaNodesSend.Create (NUM);
 	csmaNodesReceive.Add(p2pNodes.Get (1));
@@ -273,7 +294,6 @@ private:
 	csmaDevicesSend = csmaHelperSend.Install (csmaNodesSend);
 	csmaDevicesReceive = csmaHelperReceive.Install (csmaNodesReceive);
 
-	//Config::Set("/NodeList/0/DeviceList/*/TxQueue/MaxPackets", UintegerValue(bufsize));
 
 	stack.Install (csmaNodesSend);
 	stack.Install (csmaNodesReceive);
@@ -285,17 +305,32 @@ private:
 	address.SetBase ("3.3.3.0", "255.255.255.0");
 	csmaInterfacesReceive = address.Assign (csmaDevicesReceive);
 
+
 	// enable routing
-	Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
+	Ipv4GlobalRoutingHelper::PopulateRoutingTables ();*/
 
 	//Setup("ns3::TcpTahoe");
 	//Setup(algs[iteration]);
-	Simulator::Schedule (Seconds(0.0), &Arbiter::Setup, this, algs[iteration]);
+	//Simulator::Schedule (Seconds(0.0), &Arbiter::Setup, this, algs[iteration]);
+	Simulator::Schedule (Seconds(0.0), &Arbiter::eval, this);
   }
+
+void eval() {
+
+	Simulator::Schedule (Seconds(0.0), &Arbiter::Setup, this, algs[0]);
+	Simulator::Schedule (Seconds(150.0), &Arbiter::Setup, this, algs[1]);
+	Simulator::Schedule (Seconds(300.0), &Arbiter::Setup, this, algs[2]);
+	Simulator::Schedule (Seconds(450.0), &Arbiter::Setup, this, algs[3]);
+
+}
 
 void Setup(const char *name) {
 
 	//std::cout << Simulator::Now().GetSeconds() << std::endl;
+
+	for (int i = 0; i < NUM; i++) {
+		cwnds[i] = 0;
+	}
 
 	uint16_t sinkPort = 8080;
 	Address sinkAddress[NUM];
@@ -334,14 +369,20 @@ void Setup(const char *name) {
 		if(i == 0) {
 			Config::Set (specificNode[i], TypeIdValue (tid));
 		} else {
-			Config::Set (specificNode[i], TypeIdValue (TypeId::LookupByName ("ns3::TcpWestwood")));
+			Config::Set (specificNode[i], TypeIdValue (TypeId::LookupByName ("ns3::TcpReno")));
 		}
 
 		ns3TcpSocket[i] = Socket::CreateSocket (csmaNodesSend.Get (i + 1), TcpSocketFactory::GetTypeId ());
+		//ns3TcpSocket[i]->SetAttribute("SegmentSize", UintegerValue(2000));
 		ns3TcpSocket[i]->TraceConnectWithoutContext ("CongestionWindow", MakeCallback (&CwndChange));
 		ns3TcpSocket[i]->TraceConnectWithoutContext ("RTT", MakeCallback (&RttChange));
-		//ns3TcpSocket[i]->SetAttribute("SegmentSize", UintegerValue(alpha[i]));
-		ns3TcpSocket[i]->SetAttribute("SlowStartThreshold", UintegerValue(0));
+		if(i == 0) {
+			ns3TcpSocket[i]->SetAttribute("SegmentSize", UintegerValue(2000));
+		} else {
+			ns3TcpSocket[i]->SetAttribute("SegmentSize", UintegerValue(1000));
+		}
+		//ns3TcpSocket[i]->SetAttribute("SegmentSize", UintegerValue(1000));
+		//ns3TcpSocket[i]->SetAttribute("SlowStartThreshold", UintegerValue(0));
 	
 		// setup the data-sending apps on sender nodes
 		app[i] = CreateObject<MyApp> ();
@@ -352,7 +393,7 @@ void Setup(const char *name) {
 	}
 
 	monitor = flowmon.InstallAll();
-	Simulator::Schedule (Seconds(SIMTIME + 1), &Arbiter::getStats, this, name);
+	Simulator::Schedule (Seconds(SIMTIME + 20), &Arbiter::getStats, this, name);
 	//std::cout << "Setup exit at: " << Simulator::Now().GetSeconds() << std::endl;
 	//Simulator::Schedule (Seconds(12.0), &Arbiter::Setup, this, "ns3::TcpReno");
 }
@@ -386,16 +427,23 @@ void getStats(const char *name)
 	//Simulator::Schedule (Seconds(1.0), &Arbiter::Setup, this, "ns3::TcpReno");
 	thp[iteration] = stats[4*iteration + 1].rxBytes / (stats[4*iteration + 1].timeLastRxPacket.GetSeconds() - stats[4*iteration + 1].timeFirstTxPacket.GetSeconds());
 	iteration++;
-	if(iteration < 4) {
+	/*if(iteration < 4) {
 		Simulator::Schedule (Seconds(100.0), &Arbiter::Setup, this, algs[iteration]);
-	}
+	}*/
 	//std::cout << "getStats exit at: " << Simulator::Now().GetSeconds() << std::endl;
 }
 
 	void StopApplication (void) {
-		for(int i = 0; i < 4; i++) {
-			printf("Thp[%d] = %f\n", i, thp[i]);
+		int max = thp[0];
+		int imax = 0;
+		for(int i = 0; i < NUMPROTO; i++) {
+			if (thp[i] > max) {
+				max = thp[i];
+				imax = i;
+			}
+			//printf("Thp[%d] = %f\n", i, thp[i]);
 		}
+		printf("According to testing, the best protocol is %s\n", algs[imax]);
 	}
 
 };
@@ -408,12 +456,60 @@ void getStats(const char *name)
 int
 main (int argc, char *argv[])
 {
+	//LogComponentEnable ("PacketSink", LOG_LEVEL_INFO);
+	//LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_LOGIC);
     //init();
-    
+
+	p2pNodes.Create (2);
+	csmaNodesSend.Add(p2pNodes.Get (0));
+	csmaNodesSend.Create (NUM);
+	csmaNodesReceive.Add(p2pNodes.Get (1));
+	csmaNodesReceive.Create (NUM);
+
+	// bottleneck link
+	pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("1Mbps"));
+
+	p2pDevices = pointToPoint.Install (p2pNodes);
+	csmaDevicesSend = csmaHelperSend.Install (csmaNodesSend);
+	csmaDevicesReceive = csmaHelperReceive.Install (csmaNodesReceive);
+
+	//Config::Set("/NodeList/0/DeviceList/*/TxQueue/MaxPackets", UintegerValue(bufsize));
+
+	stack.Install (csmaNodesSend);
+	stack.Install (csmaNodesReceive);
+
+	address.SetBase ("2.2.2.0", "255.255.255.0");
+	p2pInterfaces = address.Assign (p2pDevices);
+	address.SetBase ("1.1.1.0", "255.255.255.0");
+	csmaInterfacesSend = address.Assign (csmaDevicesSend);
+	address.SetBase ("3.3.3.0", "255.255.255.0");
+	csmaInterfacesReceive = address.Assign (csmaDevicesReceive);
+
+	Config::Set("/NodeList/0/DeviceList/*/TxQueue/MaxPackets", UintegerValue(54));
+
+	// enable routing
+	Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
+
+  /*UdpEchoServerHelper echoServer (9);
+
+  ApplicationContainer serverApps = echoServer.Install (p2pNodes.Get (1));
+  serverApps.Start (Seconds (5.0));
+  serverApps.Stop (Seconds (50.0));
+
+  UdpEchoClientHelper echoClient (p2pInterfaces.GetAddress (1), 9);
+  echoClient.SetAttribute ("MaxPackets", UintegerValue (1000000));
+  echoClient.SetAttribute ("Interval", TimeValue (Seconds (0.2)));
+  echoClient.SetAttribute ("PacketSize", UintegerValue (40000));
+
+  ApplicationContainer clientApps = echoClient.Install (p2pNodes.Get (0));
+  clientApps.Start (Seconds (25.0));
+  clientApps.Stop (Seconds (35.0)); */
+
 	Arbiter arb1;
 	arb1.Initialize();
 
     //apps();
+
 
   Simulator::Stop(Seconds(TOTALTIME));
   Simulator::Run ();
